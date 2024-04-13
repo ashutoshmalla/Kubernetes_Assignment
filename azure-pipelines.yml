@@ -1,0 +1,35 @@
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: echo Hello, world!
+  displayName: 'Run a one-line script'
+
+# Build and push the Docker image with a tag using the Build ID
+- task: Docker@2
+  inputs:
+    containerRegistry: 'JavaApp01'
+    repository: 'javaapp'
+    command: 'buildAndPush'
+    Dockerfile: '**/Dockerfile'
+    tags: |
+      $(Build.BuildId)
+
+# Script to update the image name in k8s deployment file
+- script: |
+    sed -i 's/<TAG>/$(Build.BuildId)/' $(Build.SourcesDirectory)/deployment.yaml
+  displayName: 'Update Image Tag in Deployment Manifest'
+
+# Deploy the application using the updated manifest
+- task: KubernetesManifest@1
+  inputs:
+    action: 'deploy'
+    connectionType: 'kubernetesServiceConnection'
+    kubernetesServiceConnection: 'k8s-connection'
+    namespace: 'default'
+    manifests: |
+      $(Build.SourcesDirectory)/deployment.yaml
+      $(Build.SourcesDirectory)/service.yaml
